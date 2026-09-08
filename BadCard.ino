@@ -38,6 +38,14 @@ BleKeyboard BLEKeyboard("GoodCard :)", "VoidNoi", 100);
 #define display M5Cardputer.Display
 #define kb M5Cardputer.Keyboard
 
+// The Cardputer ADV wires its keyboard through a TCA8418 I2C expander instead
+// of the direct GPIO matrix of the original Cardputer, so no keypress is ever
+// detected there unless the M5Cardputer library is v1.1.1 or newer
+// (https://github.com/VoidNoi/BadCard/issues/19).
+#if !__has_include("utility/Keyboard/KeyboardReader/TCA8418.h")
+#warning "Your M5Cardputer library is too old for the Cardputer ADV keyboard (no input on boot). Update M5Cardputer to >= 1.1.1 in the Library Manager."
+#endif
+
 
 const int maxFiles = 100;
 
@@ -918,7 +926,7 @@ void bootLogo(){
 
   t = millis();
 
-  char version[] = "v1.7.2";
+  char version[] = "v1.7.3";
   int versionLength = sizeof(version)-1;
   int versionWidth = versionLength*letterWidth/2+3;
   int versionHeight = letterHeight/2+2;

@@ -24,6 +24,7 @@
 #include "./USBHID.h"
 #if CONFIG_TINYUSB_HID_ENABLED
 
+#include <string>
 #include "esp_event.h"
 // Default keyboardlayout
 #include "../Keyboard-Layouts/KeyboardLayout.h"

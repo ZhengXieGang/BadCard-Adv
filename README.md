@@ -4,6 +4,26 @@ BadUSB for the Cardputer with ducky script support and extra functionality
 
 Ducky Script processing and executing ported from [arducky](https://github.com/Creased/arducky)
 
+## Cardputer ADV support
+BadCard works on both the original Cardputer and the **Cardputer ADV** since v1.7.3 ([#19](https://github.com/VoidNoi/BadCard/issues/19)).
+
+The ADV keyboard is not a GPIO matrix like on the original Cardputer: it is a 56-key matrix behind a **TCA8418 I2C expander** (SDA/G8, SCL/G9, INT/G11, addr `0x34`). M5Stack added the reader for it in the M5Cardputer library **v1.1.1**, which picks the right keyboard driver automatically per board. If your firmware compiles but **no keypress is ever recognized on a Cardputer ADV**, you are building against an older M5Cardputer library — update it:
+
+* **Arduino IDE**: Library Manager → search "M5Cardputer" → update to **1.1.1** or newer (also update M5Unified/M5GFX when asked).
+* **PlatformIO**: use the included `platformio.ini`, which pins `M5Cardputer@^1.1.1`.
+* If you build with an old library anyway, the compiler now emits a `#warning` about it.
+
+## How to build
+With [arduino-cli](https://arduino.github.io/arduino-cli/) and the esp32 core installed:
+
+```sh
+arduino-cli core install esp32:esp32
+arduino-cli lib install "M5Cardputer@1.1.1" NimBLE-Arduino@1.4.3
+./build.sh
+```
+
+The flashable artifacts land in `firmware/` — `BadCard.ino.merged.bin` is a single full flash image (flash it at offset `0x0` with `esptool.py write_flash`).
+
 ## FEATURES
 * Bluetooth connection
 * File editing (Thanks to [@guidoaguiar](https://github.com/guidoaguiar))
