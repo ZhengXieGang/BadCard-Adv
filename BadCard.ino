@@ -235,7 +235,6 @@ void executeScript() {
   if (SD.exists(fileName)) {
     
     if (!isBLE) {
-      USB.begin();
       Keyboard.begin(layout);
     } else {
       BLEKeyboard.setLayout(layout);
@@ -377,13 +376,13 @@ void processLine(String line) {
     delay((int) payload.toInt());                           // Convert payload to integer and make pause for 'payload' time
   } else if (command == "STRING") {
     int payloadLen = payload.length();
-    unsigned char array[payloadLen];
+    unsigned char array[payloadLen + 1];
     for (int i = 0; i < payloadLen; i++) {
       array[i] = payload[i];
     }
     array[payloadLen] = '\0';
 
-    char16_t uString[payloadLen];
+    char16_t uString[payloadLen + 1];
 
     utf8_to_utf16(&array[0], payloadLen, &uString[0], payloadLen);
     uString[payloadLen] = '\0';
@@ -1090,6 +1089,14 @@ void getLang() {
 }
 
 void setup() {
+  // Enumerate as a plain boot keyboard: BIOS and GRUB only bind class-0
+  // devices whose HID interface declares the boot keyboard subclass/protocol.
+  // A composite (CDC) device reports the MISC class and is ignored there.
+  USB.usbClass(0);
+  USB.usbSubClass(0);
+  USB.usbProtocol(0);
+  USB.begin();
+
   auto cfg = M5.config();
   M5Cardputer.begin(cfg, true);
 
