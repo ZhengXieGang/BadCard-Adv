@@ -103,23 +103,40 @@ BleKeyboard::BleKeyboard(std::string deviceName, std::string deviceManufacturer,
   _asciimap = KeyboardLayout_en_US;
 }
 
-void BleKeyboard::begin(void)
+bool BleKeyboard::begin(void)
 {
-  BLEDevice::init(deviceName);
+  if (!BLEDevice::init(deviceName)) {
+    ESP_LOGE(LOG_TAG, "BLE init failed (out of memory?)");
+    return false;
+  }
+
   BLEServer* pServer = BLEDevice::createServer();
+  if (pServer == nullptr) {
+    ESP_LOGE(LOG_TAG, "BLE server allocation failed");
+    return false;
+  }
   pServer->setCallbacks(this);
 
   hid = new BLEHIDDevice(pServer);
-  inputKeyboard = hid->inputReport(KEYBOARD_ID);  // <-- input REPORTID from report map
-  outputKeyboard = hid->outputReport(KEYBOARD_ID);
-  inputMediaKeys = hid->inputReport(MEDIA_KEYS_ID);
+  if (hid == nullptr) {
+    ESP_LOGE(LOG_TAG, "HID device allocation failed");
+    return false;
+  }
+  inputKeyboard = hid->getInputReport(KEYBOARD_ID);  // <-- input REPORTID from report map
+  outputKeyboard = hid->getOutputReport(KEYBOARD_ID);
+  inputMediaKeys = hid->getInputReport(MEDIA_KEYS_ID);
+
+  if (inputKeyboard == nullptr || outputKeyboard == nullptr || inputMediaKeys == nullptr) {
+    ESP_LOGE(LOG_TAG, "HID report allocation failed");
+    return false;
+  }
 
   outputKeyboard->setCallbacks(this);
 
-  hid->manufacturer()->setValue(deviceManufacturer);
+  hid->setManufacturer(deviceManufacturer);
 
-  hid->pnp(0x02, vid, pid, version);
-  hid->hidInfo(0x00, 0x01);
+  hid->setPnp(0x02, vid, pid, version);
+  hid->setHidInfo(0x00, 0x01);
 
 
 #if defined(USE_NIMBLE)
@@ -133,28 +150,43 @@ void BleKeyboard::begin(void)
 
 #endif // USE_NIMBLE
 
-  hid->reportMap((uint8_t*)_hidReportDescriptor, sizeof(_hidReportDescriptor));
+  hid->setReportMap((uint8_t*)_hidReportDescriptor, sizeof(_hidReportDescriptor));
+
+#if defined(USE_NIMBLE)
+  // NimBLE starts the GATT services from server start() and re-advertises
+  // after a disconnect by itself.
+  pServer->advertiseOnDisconnect(true);
+  if (!pServer->start()) {
+    ESP_LOGE(LOG_TAG, "BLE server start failed");
+    return false;
+  }
+#else
   hid->startServices();
+#endif
 
   onStarted(pServer);
 
   advertising = pServer->getAdvertising();
   advertising->setAppearance(HID_KEYBOARD);
-  advertising->addServiceUUID(hid->hidService()->getUUID());
+  advertising->addServiceUUID(hid->getHidService()->getUUID());
+#if defined(USE_NIMBLE)
+  advertising->enableScanResponse(false);
+#else
   advertising->setScanResponse(false);
+#endif
   advertising->start();
   hid->setBatteryLevel(batteryLevel);
 
   ESP_LOGD(LOG_TAG, "Advertising started!");
+  return true;
 }
 
 void BleKeyboard::setLayout(KeyboardLayout *layout) {
-  if (layout != nullptr) {
-    keyboardLayout = layout;
-    _asciimap = layout->getKeymap();
-  } else {
+  if (layout == nullptr) {
     layout = new KeyboardLayout_US();
   }
+  keyboardLayout = layout;
+  _asciimap = layout->getKeymap();
 }
 
 void BleKeyboard::end(void)
@@ -400,39 +432,17 @@ size_t BleKeyboard::write(const uint8_t *buffer, size_t size) {
 	return n;
 }
 
-void BleKeyboard::onConnect(BLEServer* pServer) {
+void BleKeyboard::onConnect(BLEServer* pServer, NimBLEConnInfo& connInfo) {
   this->connected = true;
-
-#if !defined(USE_NIMBLE)
-
-  BLE2902* desc = (BLE2902*)this->inputKeyboard->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
-  desc->setNotifications(true);
-  desc = (BLE2902*)this->inputMediaKeys->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
-  desc->setNotifications(true);
-
-#endif // !USE_NIMBLE
-
 }
 
-void BleKeyboard::onDisconnect(BLEServer* pServer) {
+void BleKeyboard::onDisconnect(BLEServer* pServer, NimBLEConnInfo& connInfo, int reason) {
   this->connected = false;
-
-#if !defined(USE_NIMBLE)
-
-  BLE2902* desc = (BLE2902*)this->inputKeyboard->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
-  desc->setNotifications(false);
-  desc = (BLE2902*)this->inputMediaKeys->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
-  desc->setNotifications(false);
-
-  advertising->start();
-
-#endif // !USE_NIMBLE
 }
 
-void BleKeyboard::onWrite(BLECharacteristic* me) {
-  uint8_t* value = (uint8_t*)(me->getValue().c_str());
-  (void)value;
-  ESP_LOGI(LOG_TAG, "special keys: %d", *value);
+void BleKeyboard::onWrite(BLECharacteristic* me, NimBLEConnInfo& connInfo) {
+  auto value = me->getValue();
+  ESP_LOGI(LOG_TAG, "special keys: %d", value.size() ? value.data()[0] : 0);
 }
 
 void BleKeyboard::delay_ms(uint64_t ms) {

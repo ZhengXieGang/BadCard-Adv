@@ -18,7 +18,7 @@ With [arduino-cli](https://arduino.github.io/arduino-cli/) and the esp32 core in
 
 ```sh
 arduino-cli core install esp32:esp32
-arduino-cli lib install "M5Cardputer@1.1.1" NimBLE-Arduino@1.4.3
+arduino-cli lib install "M5Cardputer@1.1.1" NimBLE-Arduino@2.5.1
 ./build.sh
 ```
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Build the BadCard firmware with arduino-cli.
 # Requires: arduino-cli, esp32 core (arduino-cli core install esp32:esp32),
-# M5Cardputer >= 1.1.1 (brings M5Unified/M5GFX) and NimBLE-Arduino 1.4.x:
-#   arduino-cli lib install "M5Cardputer@1.1.1" NimBLE-Arduino@1.4.3
+# M5Cardputer >= 1.1.1 (brings M5Unified/M5GFX) and NimBLE-Arduino 2.x:
+#   arduino-cli lib install "M5Cardputer@1.1.1" NimBLE-Arduino@2.5.1
 # Artifacts are copied to firmware/.
 set -euo pipefail
 

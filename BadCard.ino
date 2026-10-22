@@ -880,12 +880,17 @@ void mainOptions() {
   case 3: // BLE toggle
     display.fillScreen(BLACK);
     if (!isBLE) {
-      isBLE = true;
-      BLEKeyboard.begin();
-      sdFiles[1] = "BLE ACTIVATED";
+      isBLE = BLEKeyboard.begin();
+      if (isBLE) {
+        sdFiles[2] = "BLE ACTIVATED";
+      } else {
+        display.setCursor(1, 1);
+        display.println("BLE failed to start");
+        delay(1500);
+      }
     } else {
       isBLE = false;
-      sdFiles[1] = "ACTIVATE BLE";
+      sdFiles[2] = "ACTIVATE BLE";
     }
     break;
   case 4: // Keyboard Layouts
@@ -926,7 +931,7 @@ void bootLogo(){
 
   t = millis();
 
-  char version[] = "v1.7.3";
+  char version[] = "v1.7.4";
   int versionLength = sizeof(version)-1;
   int versionWidth = versionLength*letterWidth/2+3;
   int versionHeight = letterHeight/2+2;
@@ -1119,7 +1124,7 @@ void saveFile() {
           fileName += i;
         }
         
-        if (status.del) {
+        if (status.backspace || status.del) {
           fileName.remove(fileName.length() - 1);  
         }
         
@@ -1219,7 +1224,8 @@ void fileWrite() {
           }
         }
 
-        if (status.del) {
+        if (status.backspace) {
+          // Backspace deletes the character before the cursor.
           if (screenPosX < 0) {
             screenPosX += letterWidth;
           }
@@ -1237,6 +1243,18 @@ void fileWrite() {
             }
             fileText[cursorPosY - 1] += fileText[cursorPosY]; // Move the entire line up to the end of the line above
             removeLine(fileText, cursorPosY);
+          }
+        } else if (status.del) {
+          // fn + backspace deletes the character at the cursor.
+          if (cursorPosX < fileText[cursorPosY].length()) {
+            fileText[cursorPosY].remove(cursorPosX, 1);
+          } else if (cursorPosY < newFileLines) {
+            fileText[cursorPosY] += fileText[cursorPosY + 1]; // Join the next line onto this one
+            for (int i = cursorPosY + 1; i < newFileLines; i++) {
+              fileText[i] = fileText[i + 1];
+            }
+            fileText[newFileLines] = "";
+            newFileLines--;
           }
         }
 

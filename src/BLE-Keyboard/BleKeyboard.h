@@ -8,8 +8,10 @@
 
 #if defined(USE_NIMBLE)
 
+#include "NimBLEDevice.h"
 #include "NimBLECharacteristic.h"
 #include "NimBLEHIDDevice.h"
+#include "NimBLEAdvertising.h"
 #include "../Keyboard-Layouts/KeyboardLayout.h"
 #include "../Keyboard-Layouts/KeyboardLayout_US.h"
 
@@ -105,7 +107,7 @@ private:
 
 public:
   BleKeyboard(std::string deviceName = "ESP32 Keyboard", std::string deviceManufacturer = "Espressif", uint8_t batteryLevel = 100);
-  void begin(void);
+  bool begin(void);
   void end(void);
   void setLayout(KeyboardLayout* layout=nullptr);
   void sendReport(BLEKeyReport* keys);
@@ -128,9 +130,15 @@ public:
   void set_version(uint16_t version);
 protected:
   virtual void onStarted(BLEServer *pServer) { };
+#if defined(USE_NIMBLE)
+  virtual void onConnect(BLEServer* pServer, NimBLEConnInfo& connInfo) override;
+  virtual void onDisconnect(BLEServer* pServer, NimBLEConnInfo& connInfo, int reason) override;
+  virtual void onWrite(BLECharacteristic* me, NimBLEConnInfo& connInfo) override;
+#else
   virtual void onConnect(BLEServer* pServer) override;
   virtual void onDisconnect(BLEServer* pServer) override;
   virtual void onWrite(BLECharacteristic* me) override;
+#endif
 
 };
 
