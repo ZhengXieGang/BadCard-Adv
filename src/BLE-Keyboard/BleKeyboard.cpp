@@ -170,7 +170,11 @@ bool BleKeyboard::begin(void)
   advertising->setAppearance(HID_KEYBOARD);
   advertising->addServiceUUID(hid->getHidService()->getUUID());
 #if defined(USE_NIMBLE)
-  advertising->enableScanResponse(false);
+  // NimBLE 2.x no longer copies the GAP name into the advertising packet, and
+  // the 128-bit HID UUID leaves no room for it there, so send the name in the
+  // scan response where it still fits.
+  advertising->enableScanResponse(true);
+  advertising->setName(deviceName);
 #else
   advertising->setScanResponse(false);
 #endif
