@@ -34,6 +34,7 @@ BleKeyboard BLEKeyboard("GoodCard :)", "VoidNoi", 100);
 
 #include <SPI.h>
 #include "M5Cardputer.h"
+#include "src/AdvKeyboard.h"
 
 #define display M5Cardputer.Display
 #define kb M5Cardputer.Keyboard
@@ -1091,6 +1092,14 @@ void getLang() {
 void setup() {
   auto cfg = M5.config();
   M5Cardputer.begin(cfg, true);
+
+  // On the ADV the stock reader misses a key event that races its interrupt
+  // handler, after which the interrupt line stays low and every keypress is
+  // dropped. Use a polling reader instead.
+  if (M5.getBoard() == m5::board_t::board_M5CardputerADV) {
+    detachInterrupt(digitalPinToInterrupt(11));
+    kb.begin(std::make_unique<AdvKeyboardReader>());
+  }
 
   SPI.begin(
     M5.getPin(m5::pin_name_t::sd_spi_sclk),
