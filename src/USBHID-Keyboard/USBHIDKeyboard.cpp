@@ -27,8 +27,10 @@ ESP_EVENT_DEFINE_BASE(ARDUINO_USB_HID_KEYBOARD_EVENTS);
 esp_err_t arduino_usb_event_post(esp_event_base_t event_base, int32_t event_id, void *event_data, size_t event_data_size, TickType_t ticks_to_wait);
 esp_err_t arduino_usb_event_handler_register_with(esp_event_base_t event_base, int32_t event_id, esp_event_handler_t event_handler, void *event_handler_arg);
 
+// No Report ID: boot-protocol hosts (BIOS, GRUB) expect the fixed 8-byte
+// boot keyboard report, and a leading Report ID shifts every field.
 static const uint8_t report_descriptor[] = {
-    TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(HID_REPORT_ID_KEYBOARD))};
+    TUD_HID_REPORT_DESC_KEYBOARD()};
 
 USBHIDKeyboard::USBHIDKeyboard() : hid()
 {
@@ -77,7 +79,7 @@ void USBHIDKeyboard::onEvent(arduino_usb_hid_keyboard_event_t event, esp_event_h
 
 void USBHIDKeyboard::_onOutput(uint8_t report_id, const uint8_t *buffer, uint16_t len)
 {
-    if (report_id == HID_REPORT_ID_KEYBOARD)
+    if (report_id == 0 || report_id == HID_REPORT_ID_KEYBOARD)
     {
         arduino_usb_hid_keyboard_event_data_t p;
         p.leds = buffer[0];
@@ -98,7 +100,7 @@ void USBHIDKeyboard::sendReport(KeyReport *keys)
     {
         memset(report.keycode, 0, 6);
     }
-    hid.SendReport(HID_REPORT_ID_KEYBOARD, &report, sizeof(report));
+    hid.SendReport(0, &report, sizeof(report));
 }
 
 size_t USBHIDKeyboard::pressRaw(uint8_t k)
