@@ -543,6 +543,29 @@ void removeLine(String file[], int y){
   newFileLines--;
 }
 
+// Keep the scroll window around the cursor. screenPosY is the first visible
+// line, so it has to be recomputed whenever the cursor or the line count
+// changes; otherwise edits such as deleting a newline leave the cursor drawn
+// at its old row while the text underneath has moved.
+void clampScreenToCursor(){
+  int visibleRows = display.height() / letterHeight;
+  if (visibleRows < 1) {
+    visibleRows = 1;
+  }
+  if (screenPosY > cursorPosY) {
+    screenPosY = cursorPosY;
+  }
+  if (cursorPosY >= screenPosY + visibleRows) {
+    screenPosY = cursorPosY - visibleRows + 1;
+  }
+  if (screenPosY > newFileLines) {
+    screenPosY = newFileLines;
+  }
+  if (screenPosY < 0) {
+    screenPosY = 0;
+  }
+}
+
 void cleanNewFile() {
   cleanArray<String*>(fileText, newFileLines);
   cursorPosX = 0;
@@ -588,17 +611,28 @@ void editFile() {
   if (myFile) {
     // Load the file into the fileText array
     newFileLines = 0;
+    cursorPosX = 0;
+    cursorPosY = 0;
+    screenPosX = 0;
+    screenPosY = 0;
     String line = "";
     while (myFile.available()) {
       char c = myFile.read();
       if ((int)c == 0x0a) {
-        fileText[newFileLines] = line;
-        newFileLines++;
+        if (newFileLines < ELEMENT_COUNT_MAX - 1) {
+          fileText[newFileLines] = line;
+          newFileLines++;
+        }
         line = "";
       }
       else if ((int)c != 0x0d) {
         line += c;
       }
+    }
+    // Keep the fragment after the last newline; a file edited elsewhere often
+    // has no trailing newline, and dropping that line would lose its content.
+    if (newFileLines < ELEMENT_COUNT_MAX) {
+      fileText[newFileLines] = line;
     }
     myFile.close();
 
@@ -1196,9 +1230,6 @@ void fileWrite() {
           if (cursorPosX >= fileText[prevCursorY].length()) {
             cursorPosX = fileText[cursorPosY].length();
           }
-          if (screenPosY > 0 && cursorPosY > 0) {
-            screenPosY--;
-          }
           if (cursorPosX * letterWidth > display.width() && fileText[cursorPosY].length() * letterWidth > display.width()) {
             screenPosX = (fileText[cursorPosY].length() - 19) * -letterWidth;
           } else {
@@ -1210,9 +1241,6 @@ void fileWrite() {
           if (cursorPosX >= fileText[prevCursorY].length()) {
             cursorPosX = fileText[cursorPosY].length();
           }
-          if (cursorPosY * letterHeight >= display.height() - letterHeight) {
-            screenPosY++;
-          }
           if (cursorPosX * letterWidth > display.width() && fileText[cursorPosY].length() * letterWidth > display.width()) {
             screenPosX = (fileText[cursorPosY].length() - 19) * -letterWidth;
           } else {
@@ -1220,18 +1248,18 @@ void fileWrite() {
           }
         } else if (status.fn && kb.isKeyPressed(',') && cursorPosX > 0) {
           cursorPosX--;
-          if (screenPosX < 0) {
+          if (cursorPosX * letterWidth + screenPosX < 0) {
             screenPosX += letterWidth;
           }
         } else if (status.fn && kb.isKeyPressed('/') && cursorPosX < fileText[cursorPosY].length()) {
           cursorPosX++;
-          if (cursorPosX * letterWidth >= display.width()) {
+          if (cursorPosX * letterWidth + screenPosX >= display.width()) {
             screenPosX -= letterWidth;
           }
         } else if (!status.fn) {
           for (auto i : status.word) {
 
-            if (cursorPosX * letterWidth >= display.width() - letterWidth) {
+            if (cursorPosX * letterWidth + screenPosX >= display.width() - letterWidth) {
               screenPosX -= letterWidth;
             }
             cursorPosX++;
@@ -1242,11 +1270,11 @@ void fileWrite() {
 
         if (status.backspace) {
           // Backspace deletes the character before the cursor.
-          if (screenPosX < 0) {
-            screenPosX += letterWidth;
-          }
           if (cursorPosX > 0) {
             cursorPosX--;
+            if (cursorPosX * letterWidth + screenPosX < 0) {
+              screenPosX += letterWidth;
+            }
             fileText[cursorPosY].remove(cursorPosX, 1);
           } else if (cursorPosX <= 0 && cursorPosY > 0) {
             
@@ -1285,9 +1313,6 @@ void fileWrite() {
           insertLine(fileText, cursorPosY);
           fileText[cursorPosY] = remainingLine;
 
-          if (cursorPosY * letterHeight >= display.height() - letterHeight) {
-            screenPosY++;
-          }
           screenPosX = 0;
           cursorPosX = 0;
         }
@@ -1296,26 +1321,30 @@ void fileWrite() {
           cursorPosX = fileText[cursorPosY].length();
         }
 
+        clampScreenToCursor();
+
         display.fillScreen(BLACK);
 
         display.setTextSize(1.5);
 
-        int drawCursorX = cursorPosX * letterWidth;
-        int drawCursorY = cursorPosY * letterHeight - 5;
+        // The text is drawn relative to (screenPosX, screenPosY), so the
+        // cursor has to use the same origin.
+        int drawCursorX = cursorPosX * letterWidth + screenPosX;
+        int drawCursorY = (cursorPosY - screenPosY) * letterHeight - 5;
 
-        if (cursorPosX * letterWidth > display.width() - letterWidth) {
+        if (drawCursorX > display.width() - letterWidth) {
           drawCursorX = display.width() - letterWidth;
         }
 
-        if (cursorPosY * letterHeight > display.height() - letterHeight) {
-          drawCursorY = (display.height() - letterHeight) - 10;
+        if (drawCursorY > display.height() - letterHeight - 10) {
+          drawCursorY = display.height() - letterHeight - 10;
         }
 
         display.drawString(cursor, drawCursorX - 3, drawCursorY, &fonts::Font2);
         
         display.setTextSize(2);
 
-        for (int i = 0; i<= newFileLines; i++) {
+        for (int i = 0; i <= newFileLines - screenPosY; i++) {
           display.drawString(fileText[i+screenPosY], screenPosX, i*letterHeight);
         }
       }

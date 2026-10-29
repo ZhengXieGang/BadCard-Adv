@@ -208,7 +208,10 @@ extern "C" uint16_t tusb_hid_load_descriptor(uint8_t * dst, uint8_t * itf)
     uint8_t descriptor[TUD_HID_INOUT_DESC_LEN] = {
         // HID Input & Output descriptor
         // Interface number, string index, protocol, report descriptor len, EP OUT & IN address, size & polling interval
-        TUD_HID_INOUT_DESCRIPTOR(*itf, str_index, HID_ITF_PROTOCOL_KEYBOARD, tinyusb_hid_device_descriptor_len, ep_out, (uint8_t)(0x80 | ep_in), 64, 1)
+        // Endpoint shape of a real boot keyboard: 8-byte report, 10 ms poll.
+        // A 64-byte endpoint with a 1 ms interval makes some BIOS/UEFI USB
+        // stacks misread the 8-byte boot report.
+        TUD_HID_INOUT_DESCRIPTOR(*itf, str_index, HID_ITF_PROTOCOL_KEYBOARD, tinyusb_hid_device_descriptor_len, ep_out, (uint8_t)(0x80 | ep_in), 8, 10)
     };
     // Advertise a boot keyboard interface (subclass 1, protocol 1) so BIOS and
     // GRUB bind it with their own HID driver instead of ignoring it.

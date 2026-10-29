@@ -218,6 +218,9 @@ size_t USBHIDKeyboard::press(uint8_t k)
         {                                 // it's a capital letter or other character reached with shift
             _keyReport.modifiers |= 0x02; // the left shift modifier
             k &= 0x7F;
+            // Report the modifier on its own before the key. Some boot-time
+            // hosts only apply Shift that arrived in an earlier report.
+            sendReport(&_keyReport);
         }
         if (k == ISO_REPLACEMENT)
         {
